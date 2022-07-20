@@ -23,7 +23,6 @@ window = sg.Window("Youtube Video Downloader", layout)
 def handleAudioDownload(values, location):
     video = pytube.YouTube(values["url"])
     audio = video.streams.filter(only_audio=True, abr=values["audioQuality"]).first()
-    print()
     audio.download(filename=re.sub(r'[\/:*?"<>|]', "", video.title) + "-AUDIO." +
                             audio.mime_type.replace("audio/", ""), output_path=location)
     window.Element("downloading").Update(value="Download complete!", visible=True)
@@ -61,19 +60,16 @@ def handleDownload(values, location):
         vidStream = handleVideoDownload(values, location)
         vidExtension = vidStream.mime_type.replace("video/", "")
         vidFile = location + "/" + legalTitle + "-VIDEO." + vidExtension
-        print(vidFile)
         os.system("ffmpeg -i \"" + vidFile + "\" -i \"" + audioFile + "\" -c copy \"" + location + "/" +
                   legalTitle + "." + vidExtension + "\"")
         os.remove(vidFile)
         os.remove(audioFile)
     except AttributeError:
         try:
-            print(vidFile)
             os.remove(vidFile)
         except FileNotFoundError:
             pass
         try:
-            print(audioFile)
             os.remove(audioFile)
         except FileNotFoundError:
             pass

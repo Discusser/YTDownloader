@@ -23,7 +23,9 @@ window = sg.Window("Youtube Video Downloader", layout)
 def handleAudioDownload(values, location):
     video = pytube.YouTube(values["url"])
     audio = video.streams.filter(only_audio=True, abr=values["audioQuality"]).first()
-    audio.download(filename=video.title + "-AUDIO." + audio.mime_type.replace("audio/", ""), output_path=location)
+    print()
+    audio.download(filename=re.sub(r'[\/:*?"<>|]', "", video.title) + "-AUDIO." +
+                            audio.mime_type.replace("audio/", ""), output_path=location)
     window.Element("downloading").Update(value="Download complete!", visible=True)
     return audio
 
@@ -38,25 +40,43 @@ def handleVideoDownload(values, location):
         quality = str(max(map(lambda n: int(n), re.findall(r"(?<=res=\")\d+", streams.all.__str__())))) \
             .__add__("p")
     vidStream = streams.filter(res=quality, fps=fps, file_extension=vidFormat).first()
-    vidStream.download(filename=video.title + "-VIDEO." + vidStream.mime_type.replace("video/", ""),
-                       output_path=location)
+    vidStream.download(filename=re.sub(r'[\/:*?"<>|]', "", video.title) + "-VIDEO." +
+                                vidStream.mime_type.replace("video/", ""), output_path=location)
     window.Element("downloading").Update(value="Download complete!", visible=True)
     return vidStream
 
 
+global vidFile, audioFile
+vidFile = ""
+audioFile = ""
+
+
 def handleDownload(values, location):
+    global vidFile, audioFile
     video = pytube.YouTube(values["url"])
     try:
+        legalTitle = re.sub(r'[\/:*?"<>|]', "", video.title)
         audio = handleAudioDownload(values, location)
+        audioFile = location + "/" + legalTitle + "-AUDIO." + audio.mime_type.replace("audio/", "")
         vidStream = handleVideoDownload(values, location)
         vidExtension = vidStream.mime_type.replace("video/", "")
-        vidFile = location + "/" + video.title + "-VIDEO." + vidExtension
-        audioFile = location + "/" + video.title + "-AUDIO." + audio.mime_type.replace("audio/", "")
+        vidFile = location + "/" + legalTitle + "-VIDEO." + vidExtension
+        print(vidFile)
         os.system("ffmpeg -i \"" + vidFile + "\" -i \"" + audioFile + "\" -c copy \"" + location + "/" +
-                  video.title + "." + vidExtension + "\"")
+                  legalTitle + "." + vidExtension + "\"")
         os.remove(vidFile)
         os.remove(audioFile)
     except AttributeError:
+        try:
+            print(vidFile)
+            os.remove(vidFile)
+        except FileNotFoundError:
+            pass
+        try:
+            print(audioFile)
+            os.remove(audioFile)
+        except FileNotFoundError:
+            pass
         window.Element("downloading").Update(value="Could not find video with the specified settings", visible=True)
         return
     window.Element("downloading").Update(value="Download complete!", visible=True)

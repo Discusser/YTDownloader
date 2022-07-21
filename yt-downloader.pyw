@@ -5,7 +5,8 @@ import PySimpleGUI as sg
 import pytube
 
 layout = [[sg.Text("Enter the URL of the video you want to download, then choose your quality and download")],
-          [sg.Text("URL: "), sg.InputText(key="url"), sg.Button("Download (this may take a while)", key="submit")],
+          [sg.Text("URL: "), sg.InputText(key="url", enable_events=True),
+           sg.Button("Download (this may take a while)", key="submit")],
           [sg.Text("Quality: "), sg.DropDown(["144p", "240p", "360p", "480p", "720p", "1080p", "1440p", "2160p",
                                               "Maximum Resolution"], default_value="720p", key="quality")],
           [sg.Text("FPS: "), sg.DropDown(["30fps", "60fps"], default_value="60fps", key="fps")],
@@ -15,7 +16,9 @@ layout = [[sg.Text("Enter the URL of the video you want to download, then choose
                                                   key="audioQuality")],
           [sg.Button("Download audio only", key="downAudio"),
            sg.Button("Download video only", key="downVideo")],
-          [sg.Text("Choose an output location (Optional)"), sg.Input(key="outputLocation"), sg.FolderBrowse()],
+          [sg.Text("Output path:"), sg.Input(key="outputLocation", default_text=os.getcwd()),
+           sg.FolderBrowse()],
+          [sg.Text("Filename:"), sg.Input(key="filename")],
           [sg.Text("Downloading... this may take a while", visible=False, key="downloading")]]
 window = sg.Window("Youtube Video Downloader", layout)
 
@@ -91,5 +94,11 @@ while True:
     if event == "downAudio":
         location = os.getcwd() if values["outputLocation"] == "" else values["outputLocation"]
         handleAudioDownload(values, location)
+    if event == "url":
+        try:
+            window.Element("filename").Update(value=re.sub(r'[\/:*?"<>|]', "", pytube.YouTube(values["url"]).title)
+                                                    + "." + values["format"])
+        except Exception:
+            pass
 
 window.close()

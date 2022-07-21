@@ -10,7 +10,7 @@ py -m pip install pytube
 2. Run the python script
 3. Enter the URL of the video you want to download in the search bar
 
-![image](https://user-images.githubusercontent.com/47938380/180036367-753a27cd-6f7f-489c-a5b7-d0e5cff86aed.png)
+![image](https://user-images.githubusercontent.com/47938380/180168555-e3fd8a74-e8ba-46c8-a5a3-af1c718f42c6.png)
 
 4. Choose the settings (there might not be a video available with the specified settings)
 5. Use whichever download button you need. The output file is in the current working directory if it is not specified and is named:

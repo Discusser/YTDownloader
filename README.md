@@ -2,18 +2,17 @@
 Simple python script to download videos from YouTube
 
 # How to use
-1. Install `PySimpleGUI` and `pytube`:
+1. Install dependencies (optionally, you could do this in a virtual environment):
 ```
-py -m pip install PySimpleGUI
-py -m pip install pytube
+pip install -r requirements.txt
 ```
 2. Run the python script
 3. Enter the URL of the video you want to download in the search bar
 
-![image](https://user-images.githubusercontent.com/47938380/180168555-e3fd8a74-e8ba-46c8-a5a3-af1c718f42c6.png)
+![image](https://user-images.githubusercontent.com/47938380/182882009-e54a2995-35cb-41ee-9413-96ff127ee631.png)
 
-4. Choose the settings (there might not be a video available with the specified settings)
-5. Use whichever download button you need. The output file is in the current working directory if it is not specified and is named:
+4. Change the settings to your likings
+5. Use whichever download button you need. The output path is the current working directory if it is not specified. The file name is:
 ```
 Video only: video_title-VIDEO.file_extension
 Audio only: video_title-AUDIO.file_extension

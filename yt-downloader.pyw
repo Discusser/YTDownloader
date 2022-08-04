@@ -103,6 +103,7 @@ while True:
         break
     if event == "submit":
         submitURL()
+        window["filename"].update(value=re.sub(r'[/:*?"<>|]', "", window["filename"].get()))
     if event == "filename":
         window["filename"].update(value=re.sub(r'[/:*?"<>|]', "", window["filename"].get()))
     if event == "download":

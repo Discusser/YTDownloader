@@ -1,84 +1,100 @@
 import os
 import re
+import threading
+from collections import OrderedDict
 
 import PySimpleGUI as sg
 import pytube
 
+from pytube.exceptions import RegexMatchError
+
 layout = [[sg.Text("Enter the URL of the video you want to download, then choose your quality and download")],
           [sg.Text("URL: "), sg.InputText(key="url", enable_events=True),
-           sg.Button("Download (this may take a while)", key="submit")],
-          [sg.Text("Quality: "), sg.DropDown(["144p", "240p", "360p", "480p", "720p", "1080p", "1440p", "2160p",
-                                              "Maximum Resolution"], default_value="720p", key="quality")],
-          [sg.Text("FPS: "), sg.DropDown(["30fps", "60fps"], default_value="60fps", key="fps")],
-          [sg.Text("Video format:"), sg.DropDown(["mp4", "webm", "3gpp"], default_value="webm", key="format")],
-          [sg.Text("Audio quality:"), sg.DropDown(["48kbps", "50kbps", "70kbps", "128kbps",
-                                                   "160kbps"], default_value="160kbps",
-                                                  key="audioQuality")],
-          [sg.Button("Download audio only", key="downAudio"),
-           sg.Button("Download video only", key="downVideo")],
+           sg.Button("Submit", key="submit")],
+          [sg.Text("Video Quality: "), sg.DropDown(["                "], key="quality")],
+          [sg.Text("Audio quality: "), sg.DropDown(["                "], key="audioQuality")],
           [sg.Text("Output path:"), sg.Input(key="outputLocation", default_text=os.getcwd()),
            sg.FolderBrowse()],
-          [sg.Text("Filename:"), sg.Input(key="filename")],
-          [sg.Text("Downloading... this may take a while", visible=False, key="downloading")]]
-window = sg.Window("Youtube Video Downloader", layout)
+          [sg.Text("Filename:"), sg.Input(key="filename", enable_events=True)],
+          [sg.Button("Download audio and video", key="download"),
+           sg.Button("Download audio only", key="downAudio"),
+           sg.Button("Download video only", key="downVideo")],
+          [sg.Text(visible=False, key="error")]]
+window = sg.Window("Youtube Video Downloader", layout, finalize=True)
+
+dropdowns = ["quality", "audioQuality", "format"]
 
 
-def handleAudioDownload(values, location):
-    video = pytube.YouTube(values["url"])
-    audio = video.streams.filter(only_audio=True, abr=values["audioQuality"]).first()
-    audio.download(filename=re.sub(r'[\/:*?"<>|]', "", video.title) + "-AUDIO." +
-                            audio.mime_type.replace("audio/", ""), output_path=location)
-    window.Element("downloading").Update(value="Download complete!", visible=True)
-    return audio
-
-
-def handleVideoDownload(values, location):
-    quality = values["quality"]
-    fps = int(values["fps"].replace("fps", ""))
-    vidFormat = values["format"]
-    video = pytube.YouTube(values["url"])
-    streams = video.streams
-    if quality == "Maximum Resolution":
-        quality = str(max(map(lambda n: int(n), re.findall(r"(?<=res=\")\d+", streams.all.__str__())))) \
-            .__add__("p")
-    vidStream = streams.filter(res=quality, fps=fps, file_extension=vidFormat).first()
-    vidStream.download(filename=re.sub(r'[\/:*?"<>|]', "", video.title) + "-VIDEO." +
-                                vidStream.mime_type.replace("video/", ""), output_path=location)
-    window.Element("downloading").Update(value="Download complete!", visible=True)
-    return vidStream
-
-
-global vidFile, audioFile
-vidFile = ""
-audioFile = ""
-
-
-def handleDownload(values, location):
-    global vidFile, audioFile
-    video = pytube.YouTube(values["url"])
+def submitURL():
     try:
-        legalTitle = re.sub(r'[\/:*?"<>|]', "", video.title)
-        audio = handleAudioDownload(values, location)
-        audioFile = location + "/" + legalTitle + "-AUDIO." + audio.mime_type.replace("audio/", "")
-        vidStream = handleVideoDownload(values, location)
-        vidExtension = vidStream.mime_type.replace("video/", "")
-        vidFile = location + "/" + legalTitle + "-VIDEO." + vidExtension
-        os.system("ffmpeg -i \"" + vidFile + "\" -i \"" + audioFile + "\" -c copy \"" + location + "/" +
-                  legalTitle + "." + vidExtension + "\"")
-        os.remove(vidFile)
-        os.remove(audioFile)
-    except AttributeError:
-        try:
-            os.remove(vidFile)
-        except FileNotFoundError:
-            pass
-        try:
-            os.remove(audioFile)
-        except FileNotFoundError:
-            pass
-        window.Element("downloading").Update(value="Could not find video with the specified settings", visible=True)
-        return
-    window.Element("downloading").Update(value="Download complete!", visible=True)
+        video = pytube.YouTube(window["url"].get())
+        window["error"].update(visible=False)
+        qualityValues = []
+        audioValues = []
+        for stream in video.streams:
+            if stream.includes_video_track and not stream.includes_audio_track:
+                if stream.resolution is not None:
+                    qualityValues.append(stream.mime_type.replace("video/", "").capitalize() + " " +
+                                         stream.resolution + str(stream.fps))
+            elif stream.includes_audio_track and not stream.includes_video_track:
+                audioValues.append(stream.abr)
+        qualityValues.sort(key=lambda elem: re.sub(r'(?<=\w\b).*', "", elem))
+        window["quality"].update(values=list(OrderedDict.fromkeys(qualityValues)))
+        audioValues = list(map(lambda string: int(string.replace("kbps", "")), audioValues))
+        audioValues.sort(reverse=True)
+        audioValues = list(map(lambda num: str(num) + "kbps", audioValues))
+        window["audioQuality"].update(values=audioValues)
+        window["filename"].update(value=video.title)
+    except RegexMatchError:
+        window["error"].update(visible=True, value="Invalid URL, please verify that you inputted the right link.")
+        threading.Timer(5.0, lambda: window["error"].update(visible=False)).start()
+
+
+def download():
+    vidFormat = downloadVideo()
+    audioFormat = downloadAudio()
+    filename = window["filename"].get()
+    outputLocation = window["outputLocation"].get()
+    video = outputLocation + "/" + filename + "-VIDEO." + vidFormat
+    audio = outputLocation + "/" + filename + "-AUDIO." + audioFormat
+    print(video)
+    print(audio)
+    os.system(
+        "ffmpeg -i "
+        "\"" + video + "\" "
+        "-i "
+        "\"" + audio + "\" "
+        "-c copy "
+        "\"" + outputLocation + "/" + filename + ".mp4" + "\""
+    )
+    os.remove(video)
+    os.remove(audio)
+
+
+def downloadVideo() -> str:
+    settings = window["quality"].get()
+    _format = re.search(r'\w+?\b', settings)[0].lower()
+    quality = re.search(r'\d+?p', settings)[0]
+    fps = re.search(r'(?<=p)\d+$', settings)[0]
+    video = pytube.YouTube(window["url"].get())
+    video.streams.filter(mime_type="video/" + _format, res=quality, fps=int(fps)).first().download(
+        filename=window["filename"].get() + "-VIDEO." + _format,
+        output_path=window["outputLocation"].get()
+    )
+    return _format
+
+
+def downloadAudio() -> str:
+    quality = window["audioQuality"].get()
+    video = pytube.YouTube(window["url"].get())
+    print(video.streams.filter(abr=quality))
+    stream = video.streams.filter(abr=quality).first()
+    _format = stream.mime_type.replace("audio/", "")
+    stream.download(
+        filename=window["filename"].get() + "-AUDIO." + _format,
+        output_path=window["outputLocation"].get()
+    )
+    return _format
 
 
 while True:
@@ -86,19 +102,14 @@ while True:
     if event == sg.WIN_CLOSED or event == 'Cancel':
         break
     if event == "submit":
-        location = os.getcwd() if values["outputLocation"] == "" else values["outputLocation"]
-        handleDownload(values, location)
+        submitURL()
+    if event == "filename":
+        window["filename"].update(value=re.sub(r'[/:*?"<>|]', "", window["filename"].get()))
+    if event == "download":
+        download()
     if event == "downVideo":
-        location = os.getcwd() if values["outputLocation"] == "" else values["outputLocation"]
-        handleVideoDownload(values, location)
+        downloadVideo()
     if event == "downAudio":
-        location = os.getcwd() if values["outputLocation"] == "" else values["outputLocation"]
-        handleAudioDownload(values, location)
-    if event == "url":
-        try:
-            window.Element("filename").Update(value=re.sub(r'[\/:*?"<>|]', "", pytube.YouTube(values["url"]).title)
-                                                    + "." + values["format"])
-        except Exception:
-            pass
+        downloadAudio()
 
 window.close()
